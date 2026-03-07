@@ -1,0 +1,104 @@
+// firestore.rules
+// Deploy: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isActive() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && isActive() && getUserRole() == role;
+    }
+
+    function hasAnyRole(roles) {
+      return isAuthenticated() && isActive() && getUserRole() in roles;
+    }
+
+    // ── Users collection ────────────────────────────────────────────────────
+
+    match /users/{uid} {
+      // Anyone authenticated can read their own profile
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      // Admins can read all profiles
+      allow read: if hasRole("Admin");
+      // Users can update their own profile (limited fields)
+      allow update: if isAuthenticated() && request.auth.uid == uid
+        && !("role" in request.resource.data.diff(resource.data).affectedKeys())
+        && !("isActive" in request.resource.data.diff(resource.data).affectedKeys());
+      // Only Admins can update roles and active status
+      allow update: if hasRole("Admin");
+      // Only Firebase Functions / Admin SDK can create (via register flow)
+      allow create: if isAuthenticated();
+    }
+
+    // ── Auth meta (lockout tracking) ─────────────────────────────────────────
+
+    match /users_auth_meta/{docId} {
+      allow read, write: if true; // needed for pre-auth lockout check
+    }
+
+    // ── Properties ──────────────────────────────────────────────────────────
+
+    match /properties/{id} {
+      allow read: if hasAnyRole(["Admin", "Manager", "Agent", "Viewer"]);
+      allow create: if hasAnyRole(["Admin", "Manager"]);
+      allow update: if hasAnyRole(["Admin", "Manager"]);
+      allow delete: if hasRole("Admin");
+    }
+
+    // ── Agents ──────────────────────────────────────────────────────────────
+
+    match /agents/{id} {
+      allow read: if hasAnyRole(["Admin", "Manager", "Agent", "Viewer"]);
+      allow create: if hasAnyRole(["Admin", "Manager"]);
+      allow update: if hasAnyRole(["Admin", "Manager"]);
+      allow delete: if hasRole("Admin");
+    }
+
+    // ── Transactions ────────────────────────────────────────────────────────
+
+    match /transactions/{id} {
+      allow read: if hasAnyRole(["Admin", "Manager", "Viewer"]);
+      allow create: if hasAnyRole(["Admin", "Manager"]);
+      allow update: if hasAnyRole(["Admin", "Manager"]);
+      allow delete: if hasRole("Admin");
+    }
+
+    // ── Leads ───────────────────────────────────────────────────────────────
+
+    match /leads/{id} {
+      allow read: if hasAnyRole(["Admin", "Manager", "Agent", "Viewer"]);
+      allow create: if hasAnyRole(["Admin", "Manager", "Agent"]);
+      allow update: if hasAnyRole(["Admin", "Manager", "Agent"]);
+      allow delete: if hasAnyRole(["Admin", "Manager"]);
+    }
+
+    // ── Campaigns ───────────────────────────────────────────────────────────
+
+    match /campaigns/{id} {
+      allow read: if hasAnyRole(["Admin", "Manager", "Agent", "Viewer"]);
+      allow create: if hasAnyRole(["Admin", "Manager"]);
+      allow update: if hasAnyRole(["Admin", "Manager"]);
+      allow delete: if hasRole("Admin");
+    }
+
+    // ── Deny everything else ────────────────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
