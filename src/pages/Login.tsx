@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Eye, EyeOff, Building2, Mail, Lock, AlertCircle, CheckCircle, ArrowRight, Loader2 } from "lucide-react";
 
 const Login = () => {
-  const { login, user } = useAuth();
+  const { login, user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
@@ -15,48 +15,51 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [shake, setShake] = useState(false);
 
   const { resetPassword } = useAuth();
 
-useEffect(() => {
-  if (user) navigate(from, { replace: true });
-}, [user, navigate, from]);
+  useEffect(() => {
+    // Only redirect if auth is fully loaded and user exists
+   if (!loading && user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, from]);
 
   // Animated background dots
   const dots = Array.from({ length: 20 }, (_, i) => i);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) { setError("Please fill in all fields."); return; }
-    setLoading(true); setError("");
+   if (!email || !password) { setError("Please fill in all fields."); return; }
+    setFormLoading(true); setError("");
     try {
       await login(email, password, rememberMe);
-      navigate(from, { replace: true });
+      // Navigation will happen automatically via useEffect when auth state updates
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed";
       setError(msg);
       setShake(true);
       setTimeout(() => setShake(false), 600);
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) { setError("Enter your email address."); return; }
-    setLoading(true); setError("");
+   if (!email) { setError("Enter your email address."); return; }
+    setFormLoading(true); setError("");
     try {
       await resetPassword(email);
       setSuccess("Password reset email sent! Check your inbox.");
     } catch {
       setError("Failed to send reset email. Check the address.");
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
@@ -177,10 +180,10 @@ useEffect(() => {
                 </div>
 
                 {/* Submit */}
-                <button type="submit" disabled={loading}
+                <button type="submit" disabled={formLoading}
                   className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.01] hover:shadow-lg disabled:opacity-60 disabled:scale-100 mt-2"
-                  style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 4px 20px rgba(99,102,241,0.4)" }}>
-                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Signing in...</> : <>Sign In <ArrowRight className="h-4 w-4" /></>}
+                 style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 4px 20px rgba(99,102,241,0.4)" }}>
+                  {formLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Signing in...</> : <>Sign In <ArrowRight className="h-4 w-4" /></>}
                 </button>
               </form>
 
@@ -228,10 +231,10 @@ useEffect(() => {
                       onBlur={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"} />
                   </div>
                 </div>
-                <button type="submit" disabled={loading}
+                <button type="submit" disabled={formLoading}
                   className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.01] disabled:opacity-60"
-                  style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 4px 20px rgba(99,102,241,0.4)" }}>
-                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : "Send Reset Link"}
+                 style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 4px 20px rgba(99,102,241,0.4)" }}>
+                  {formLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : "Send Reset Link"}
                 </button>
               </form>
             </>
